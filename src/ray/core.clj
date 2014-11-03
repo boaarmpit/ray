@@ -4,7 +4,13 @@
   (:use clojure.core.matrix.operators)
   (:require [clojure.math.numeric-tower :as math])
   (:require [mikera.image.core :as image])
-  (:require [mikera.image.colours :as colours]))
+  (:require [mikera.image.colours :as colours])
+  (:require [ray.colours :as c])
+  (:require [mikera.vectorz.core :as v])
+  (:import [java.awt.image BufferedImage])
+  (:import [mikera.image])
+  (:import [mikera.vectorz Vector3 Vector4 AVector Vectorz])
+  )
 (set-current-implementation :vectorz)
 
 (set! *warn-on-reflection* true)
@@ -38,7 +44,7 @@
 (defn checker-texture [x y checker-spacing]
   (let [xs (math/round (/ (mod x checker-spacing) checker-spacing))
         ys (math/round (/ (mod y checker-spacing) checker-spacing))]
-    (mod (+ xs ys) 2)))
+    (mod (+ xs ys) 2.0)))
 
 (defn ray-plane [P0 P1]
   ;Ray-(ground)Plane Intersection:
@@ -51,35 +57,34 @@
         (+ P0 (* P1 t))))))
 
 
-(do
-  (def r-rand (rand))
-  (def g-rand (rand))
-  (def b-rand (rand))
-  )
+(defn new-image
+  "Creates a new blank image"
+  ([w h]
+   (mikera.gui.ImageUtils/newImage (int w) (int h))))
 
-(dotimes [i (* res-x res-y)]
-  (let [x (mod i res-x)
-        y (quot i res-x)
-        plane-intersection (ray-plane camera-location (camera-ray (/ x res-x) (/ y res-y)))]
-    (if plane-intersection
-      (let [u-tex (mget plane-intersection 0)
-            v-tex (mget plane-intersection 2)
-            pixel-intensity (int (checker-texture u-tex v-tex 1))]
-        (aset ^ints pixels i (colours/rgb (* r-rand pixel-intensity) (* g-rand pixel-intensity) (* b-rand pixel-intensity)))))))
+(defn render []
+  (let [width (int res-x)
+        height (int res-y)
+        colour-result (v/vec4 [0 0 0 1])
+        r-rand (rand)
+        g-rand (rand)
+        b-rand (rand)
+        ^BufferedImage im (new-image width height)]
+    (dotimes [ix width]
+      (dotimes [iy height]
+        (let [plane-intersection (ray-plane camera-location (camera-ray (/ ix res-x) (/ iy res-y)))
+              ]
+          (if plane-intersection
+            (let [u-tex (mget plane-intersection 0)
+                  v-tex (mget plane-intersection 2)
+                  temp (v/vec3)
+                  pixel-intensity (checker-texture u-tex v-tex 1)
+                  ]
+              (.setValues colour-result ^double pixel-intensity ^double pixel-intensity ^double pixel-intensity 1.0)
+              (.setRGB im ix iy (c/argb-from-vector4 colour-result)))))))
+    im))
 
-
-(comment (dotimes [i (* res-x res-y)]
-           (aset pixels i (colours/rgb (* r-rand) (* g-rand) (* b-rand)))))
-
-
-;; update the image with the newly changed pixel values
-(image/set-pixels bi pixels)
-
-;; view our new work of art
-;; the zoom function will automatically interpolate the pixel values
-(image/show bi :zoom (/ 500 res-x) :title "Isn't it beautiful?")
-
-
+(time (image/show (render) :zoom (/ 500 res-x) :title "Isn't it beautiful?"))
 
 (comment
   (def A (identity-matrix res-x))

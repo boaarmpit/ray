@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="Leiningen: net.mikera/mathz:0.0.4">
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/net/mikera/mathz/0.0.4/mathz-0.0.4.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

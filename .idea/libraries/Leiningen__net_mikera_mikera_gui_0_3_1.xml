@@ -4,6 +4,8 @@
       <root url="jar://$MAVEN_REPOSITORY$/net/mikera/mikera-gui/0.3.1/mikera-gui-0.3.1.jar!/" />
     </CLASSES>
     <JAVADOC />
-    <SOURCES />
+    <SOURCES>
+      <root url="jar://$MAVEN_REPOSITORY$/net/mikera/mikera-gui/0.3.1/mikera-gui-0.3.1-sources.jar!/" />
+    </SOURCES>
   </library>
 </component>
