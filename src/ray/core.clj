@@ -23,11 +23,12 @@
 
 (def pi (* 4 (Math/atan 1)))
 
+
 ;setup output image
 (do
   ;;image horizontal and vertical resolution
-  (def res-x 500)
-  (def res-y 500))
+  (def res-x 2000)
+  (def res-y 2000))
 
 ;;setup camera
 ;(def camera-location (array [0 1 0]))
@@ -40,6 +41,7 @@
         camera-y (array [0 1 0])]
     (+ (* 2 (- x 0.5) camera-x) (* -2 (- y 0.5) camera-y) camera-direction))
   )
+
 
 
 ;checkerboard texture: returns 1 or 0 for x,y coordinates on checker-spacing size grid
@@ -115,9 +117,11 @@
               (.setRGB im ix iy (c/argb-from-vector4 colour-result)))))))
     im))
 
+
+
 (defn render-reflective-sphere []
   (let [colour-result (v/vec4 [0 0 0 1])
-        ^Vector3 camera-location (v/vec3 [0 1.3 0])
+        ^Vector3 camera-location (v/vec3 [0 0.2 0])
         ^Vector3 camera-direction (v/vec3 [1 0 1])
         ^Vector3 camera-x (v/vec3 [0.5 0 -0.5])
         ^Vector3 camera-y (v/vec3 [0 0.707 0])
@@ -138,16 +142,17 @@
         (let [{:keys [sphere-intersection normal]} (ray-sphere camera-location dir sphere-origin sphere-radius)
               plane-intersection (ray-plane camera-location dir)]
           (if sphere-intersection
-            (let [plane-intersection2 (ray-plane sphere-intersection normal)]
+            (let [reflected-direction (- dir (* 2 (dot dir normal) normal))
+                  plane-intersection2 (ray-plane sphere-intersection reflected-direction)]
               (let [pixel-intensity (if plane-intersection2
                                       (let [u-tex (mget plane-intersection2 0)
                                             v-tex (mget plane-intersection2 2)
-                                            pixel-intensity (* (* 1 (checker-texture u-tex v-tex 1))
+                                            pixel-intensity (+ (* 0.5 (checker-texture u-tex v-tex 1))
                                                                (+ (* 0.5 (math/expt (Math/sin (* pi 0.5 (dot normal
-                                                                                                           (v/vec3
+                                                                                                             (v/vec3
                                                                                                                light-direction)))) 50))
                                                                   (* 0.3 (math/expt (Math/sin (* pi 0.5 (dot normal
-                                                                                                           (v/vec3
+                                                                                                             (v/vec3
                                                                                                                light-direction)))) 5))
                                                                   ))]
                                         pixel-intensity)
@@ -168,98 +173,11 @@
                 (.setValues colour-result pixel-intensity pixel-intensity pixel-intensity 1.0)
                 (.setRGB im ix iy (c/argb-from-vector4 colour-result))
                 ))))))
-    im))
+    im)
 
 
 
-;(time (image/show (render-plane-and-sphere) :zoom (/ 500 res-x) :title "Isn't it beautiful?"))
-;(time (image/show (render-plane) :zoom (/ 500 res-x) :title "Isn't it beautiful?"))
-;(time (image/show (render-sphere) :zoom (/ 500 res-x) :title "Isn't it beautiful?"))
+  )
+
 (time (image/show (render-reflective-sphere) :zoom (/ 500 res-x) :title "Isn't it beautiful?"))
 
-
-(defn render-plane-and-sphere []
-  (let [colour-result (v/vec4 [0 0 0 1])
-        ^Vector3 camera-location (v/vec3 [0 1 0])
-        ^Vector3 camera-direction (v/vec3 [0 0 1])
-        ^Vector3 camera-x (v/vec3 [1 0 0])
-        ^Vector3 camera-y (v/vec3 [0 1 0])
-        ^Vector3 sphere-origin (v/vec3 [0 0 3])
-        sphere-radius 1
-
-        ;MUTABLES
-        ^Vector3 dir (v/vec3 [0 0 0])
-        ^BufferedImage im (new-image res-x res-y)]
-
-    (dotimes [ix res-x]
-      (dotimes [iy res-y]
-        (.set dir camera-direction)
-        (v/add-multiple! dir camera-x (* 2 (- (/ (double ix) res-x) 0.5)))
-        (v/add-multiple! dir camera-y (* -2 (- (/ (double iy) res-y) 0.5)))
-        (v/normalise! dir)
-        (let [{:keys [sphere-hit sphere-intersection]} (ray-sphere camera-location dir sphere-origin sphere-radius)
-              plane-intersection (ray-plane camera-location dir)]
-          (if (and sphere-intersection plane-intersection)
-            (let [plane-distance (v/magnitude (- plane-intersection camera-location))
-                  sphere-distance (v/magnitude (- sphere-intersection camera-location))
-                  pixel-intensity (if (< sphere-distance plane-distance) 1.0 0.0)]
-              ;(.setValues colour-result pixel-intensity pixel-intensity pixel-intensity 1.0)
-              (.setValues colour-result pixel-intensity 0 0 1.0)
-              (.setRGB im ix iy (c/argb-from-vector4 colour-result)))))))
-    im))
-
-(defn render-plane []
-  (let [colour-result (v/vec4 [0 0 0 1])
-        ^Vector3 camera-location (v/vec3 [0 1 0])
-        ^Vector3 camera-direction (v/vec3 [0 0 1])
-        ^Vector3 camera-x (v/vec3 [1 0 0])
-        ^Vector3 camera-y (v/vec3 [0 1 0])
-
-        ;MUTABLES
-        ^Vector3 dir (v/vec3 [0 0 0])
-        ^BufferedImage im (new-image res-x res-y)]
-
-    (dotimes [ix res-x]
-      (dotimes [iy res-y]
-        (.set dir camera-direction)
-        (v/add-multiple! dir camera-x (* 2 (- (/ (double ix) res-x) 0.5)))
-        (v/add-multiple! dir camera-y (* -2 (- (/ (double iy) res-y) 0.5)))
-        (v/normalise! dir)
-        (let [plane-intersection (ray-plane camera-location dir)]
-          (if plane-intersection
-            (let [u-tex (mget plane-intersection 0)
-                  v-tex (mget plane-intersection 2)
-                  pixel-intensity (checker-texture u-tex v-tex 1)
-                  ]
-              (.setValues colour-result ^double pixel-intensity ^double pixel-intensity ^double pixel-intensity 1.0)
-              (.setRGB im ix iy (c/argb-from-vector4 colour-result)))))))
-    im))
-
-
-(defn render-old []
-  (let [colour-result (v/vec4 [0 0 0 1])
-        r-rand (rand)
-        g-rand (rand)
-        b-rand (rand)
-        camera-direction (array [0 0 1])
-        camera-x (array [1 0 0])
-        camera-y (array [0 1 0])
-
-        ;MUTABLES
-        ^Vector3 dir (v/vec3 [0 0 0])
-        ^BufferedImage im (new-image res-x res-y)]
-
-    (dotimes [ix res-x]
-      (dotimes [iy res-y]
-        (.set dir camera-direction)
-        (v/add-multiple! dir camera-x (* 2 (- (/ ix res-x) 0.5)))
-        (v/add-multiple! dir camera-y (* -2 (- (/ iy res-y) 0.5)))
-        (v/normalise! dir)
-        (let [plane-intersection (ray-plane camera-location dir)]
-          (if plane-intersection
-            (let [u-tex (mget plane-intersection 0)
-                  v-tex (mget plane-intersection 2)
-                  pixel-intensity (checker-texture u-tex v-tex 1)]
-              (.setValues colour-result ^double (* r-rand pixel-intensity) ^double (* g-rand pixel-intensity) ^double (* b-rand pixel-intensity) 1.0)
-              (.setRGB im ix iy (c/argb-from-vector4 colour-result)))))))
-    im))
