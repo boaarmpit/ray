@@ -4,18 +4,10 @@
   (:use clojure.core.matrix.operators)
   (:require [clojure.math.numeric-tower :as math])
   (:require [mikera.image.core :as image])
-  ;(:require [mikera.image.colours :as colours])
-
-
-  ;(:require [mikera.vectorz.core :as v])
-  ;(:require [mikera.vectorz.matrix :as m])
-
   (:require [ray.colours :as c])
   (:require [mikera.vectorz.core :as v])
   (:import [java.awt.image BufferedImage])
-  ;(:import [mikera.image])
-  (:import [mikera.vectorz Vector3 Vector4 AVector Vectorz])
-  )
+  (:import [mikera.vectorz Vector3 Vector4 AVector Vectorz]))
 (set-current-implementation :vectorz)
 
 (set! *warn-on-reflection* true)
@@ -23,15 +15,12 @@
 
 (def pi (* 4 (Math/atan 1)))
 
-
 ;setup output image
 (do
   ;;image horizontal and vertical resolution
-  (def res-x 2000)
-  (def res-y 2000))
+  (def res-x 500)
+  (def res-y 500))
 
-;;setup camera
-;(def camera-location (array [0 1 0]))
 
 (defn camera-ray
   "x and y are coordinates from 0 to 1, starting at the top left of the image"
@@ -41,7 +30,6 @@
         camera-y (array [0 1 0])]
     (+ (* 2 (- x 0.5) camera-x) (* -2 (- y 0.5) camera-y) camera-direction))
   )
-
 
 
 ;checkerboard texture: returns 1 or 0 for x,y coordinates on checker-spacing size grid
@@ -54,7 +42,7 @@
   "Ray-(ground)Plane Intersection:
   where the ray is defined as P0+tP1 with parameter t
   and the plane is the x-z (ground) plane (y=0)
-  P0 and P1 are mikera.vectorz Vector3's (vectors)"
+  P0 and P1 are mikera.vectorz Vector3s (vectors)"
   [P0 P1]
   (if-not (zero? (mget P1 1))
     (let [t (- (/ (mget P0 1) (mget P1 1)))]
@@ -78,10 +66,6 @@
                                             normal (v/normalise (- intersection C))]
                                         [intersection normal]))]
     {:sphere-intersection intersection :normal normal}))
-
-;t = (-b-sqrt(b^2-4*a*c))/(2*a);
-;hitPoint = P0+t*P1;
-;normal = (hitPoint-C)/norm(hitPoint-C)
 
 
 (defn new-image
@@ -111,9 +95,7 @@
         (let [{:keys [sphere-intersection normal]} (ray-sphere camera-location dir sphere-origin sphere-radius)]
           (if sphere-intersection
             (let [pixel-intensity (+ (/ (math/expt (- (v/mget normal 2)) 30) 1.5) (/ (- (v/mget normal 2)) 3))]
-              ;(/ (- (v/magnitude (- sphere-intersection camera-location)) 2) 1)
               (.setValues colour-result pixel-intensity pixel-intensity pixel-intensity 1.0)
-              ;(.setValues colour-result 1.0 0 0 1.0)
               (.setRGB im ix iy (c/argb-from-vector4 colour-result)))))))
     im))
 
@@ -148,36 +130,25 @@
                                       (let [u-tex (mget plane-intersection2 0)
                                             v-tex (mget plane-intersection2 2)
                                             pixel-intensity (+ (* 0.5 (checker-texture u-tex v-tex 1))
-                                                               (+ (* 0.5 (math/expt (Math/sin (* pi 0.5 (dot normal
-                                                                                                             (v/vec3
-                                                                                                               light-direction)))) 50))
-                                                                  (* 0.3 (math/expt (Math/sin (* pi 0.5 (dot normal
-                                                                                                             (v/vec3
-                                                                                                               light-direction)))) 5))
-                                                                  ))]
+                                                               (+ (* 0.5 (math/expt (Math/sin (* pi 0.5 (dot normal (v/vec3 light-direction)))) 50))
+                                                                  (* 0.3 (math/expt (Math/sin (* pi 0.5 (dot normal (v/vec3 light-direction)))) 5))))]
                                         pixel-intensity)
-                                      (+ (* 0.5 (math/expt (Math/sin (* pi 0.5 (dot normal (v/vec3 light-direction)))
-                                                                     ) 50))
-                                         (* 0.3 (math/expt (Math/sin (* pi 0.5 (dot normal (v/vec3 light-direction)))
-                                                                     ) 5))))]
+                                      (+ (* 0.5 (math/expt (Math/sin (* pi 0.5 (dot normal (v/vec3 light-direction)))) 50))
+                                         (* 0.3 (math/expt (Math/sin (* pi 0.5 (dot normal (v/vec3 light-direction)))) 5))))]
                 (.setValues colour-result ^double pixel-intensity ^double pixel-intensity ^double pixel-intensity 1.0)
                 (.setRGB im ix iy (c/argb-from-vector4 colour-result))))
             (if plane-intersection
               (let [u-tex (mget plane-intersection 0)
                     v-tex (mget plane-intersection 2)
-                    pixel-intensity (checker-texture u-tex v-tex 2)
-                    ]
+                    pixel-intensity (checker-texture u-tex v-tex 2)]
                 (.setValues colour-result ^double pixel-intensity ^double pixel-intensity ^double pixel-intensity 1.0)
                 (.setRGB im ix iy (c/argb-from-vector4 colour-result)))
               (let [pixel-intensity 0.0]
                 (.setValues colour-result pixel-intensity pixel-intensity pixel-intensity 1.0)
-                (.setRGB im ix iy (c/argb-from-vector4 colour-result))
-                ))))))
-    im)
+                (.setRGB im ix iy (c/argb-from-vector4 colour-result))))))))
+    im))
 
+(time (image/show (render-reflective-sphere) :title "Isn't it beautiful?"))
+;(time (image/show (render-sphere) :title "Isn't it beautiful?"))
 
-
-  )
-
-(time (image/show (render-reflective-sphere) :zoom (/ 500 res-x) :title "Isn't it beautiful?"))
 
