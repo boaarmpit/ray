@@ -15,13 +15,12 @@
 
 (def pi (* 4 (Math/atan 1)))
 
-
-
 ;setup output image
 (do
   ;;image horizontal and vertical resolution
   (def res-x 500)
   (def res-y 500))
+
 (defn new-image
   "Creates a new blank image"
   ([w h]
@@ -30,6 +29,7 @@
 ;define object types (spheres and planes)
 (defprotocol SceneObject
   (intersect [this ray]))
+
 (defrecord Sphere [center radius]
   SceneObject
   (intersect [this ray]
@@ -49,27 +49,26 @@
                                                 normal (v/normalise (- intersection C))]
                                             [intersection normal]))]
         {:sphere-intersection intersection :normal normal}))))
+
 (defrecord Plane [point normal]
   SceneObject
   (intersect [this ray]
     (print "intersecting ray with plane\n")))
 
 (defprotocol SurfaceObject
-  (surface-colour [this {:keys [normal light-direction eye-direction] :or {}}])
+  (surface-colour [this {:keys [normal light-direction eye-direction]}])
   (surface-reflectivity [this]))
 
 (defrecord Lambertian []
   SurfaceObject
-  (surface-colour [this {:keys [normal light-direction eye-direction] :or {}}]
+  (surface-colour [this {:keys [normal light-direction eye-direction]}]
     (let [lambert (- (v/dot normal light-direction))]
       (if (pos? lambert) lambert 0)))
   (surface-reflectivity [this]))
 
-
-
 (defrecord Phong [phong-exponent]
   SurfaceObject
-  (surface-colour [this {:keys [normal light-direction eye-direction] :or {}}]
+  (surface-colour [this {:keys [normal light-direction eye-direction]}]
     (let [light-reflection-direction (+ (* -2 (v/dot light-direction normal) normal) light-direction)
           dot-light-eye (v/dot light-reflection-direction eye-direction)]
       (if (pos? dot-light-eye)
@@ -77,14 +76,18 @@
         0)))
   (surface-reflectivity [this]))
 
-(defrecord LambertPhong [phong-exponent]
+(defrecord LambertPhong [lambert-weight lambert-colour phong-weigh phong-colour phong-exponent]
   SurfaceObject
+
   (surface-colour [this {:keys [normal light-direction eye-direction] :or {}}]
     (let [light-reflection-direction (+ (* -2 (v/dot light-direction normal) normal) light-direction)
-          dot-light-eye (v/dot light-reflection-direction eye-direction)]
-      (if (pos? dot-light-eye)
-        (math/expt dot-light-eye phong-exponent)
-        0)))
+          phong-dot-light-eye (v/dot light-reflection-direction eye-direction)
+          phong-component (if (pos? phong-dot-light-eye) (math/expt phong-dot-light-eye phong-exponent) 0)
+          lambert-component (- (v/dot normal light-direction))]
+      (+ (* phong-weigh phong-colour phong-component)
+         (* lambert-weight lambert-colour lambert-component)
+         )))
+
   (surface-reflectivity [this]))
 
 
@@ -107,46 +110,35 @@
     (+ (* 2 (- (/ (+ (rand) (double x)) res-x) 0.5) camera-x) (* -2 (- (/ (+ (rand) (double y)) res-y) 0.5) camera-y) camera-direction)))
 
 
-
 (defn render-sphere2 []
   (let [colour-result (v/vec4 [0 0 0 1])
 
         ^Vector3 light-direction (v/normalise (v/vec3 [-1 -1 2]))
+        my-camera (map->Camera {:camera-location ^Vector3 (v/vec3 [0 1 0]) :camera-direction ^Vector3 (v/vec3 [0 0 1])
+                                :camera-x        ^Vector3 (v/vec3 [1 0 0])
+                                :camera-y        ^Vector3 (v/vec3 [0 1 0])})
 
-        ^Vector3 camera-location (v/vec3 [0 1 0])
-        ^Vector3 camera-direction (v/vec3 [0 0 1])
-        ^Vector3 camera-x (v/vec3 [1 0 0])
-        ^Vector3 camera-y (v/vec3 [0 1 0])
-        my-camera (Camera. camera-location camera-direction camera-x camera-y)
-
-        ^Vector3 sphere-origin (v/vec3 [0 0.5 3])
-        sphere-radius 1.5
-        my-sphere (Sphere. sphere-origin sphere-radius)
-
-        ;lamb-weight 0
-        ;lamb-colour 0
-        ;phong-weight 0
-        ;phong-colour 0
-        ;phong-exponent 1
-        ;sphere-surface (LambertPhong. lamb-weight lamb-colour phong-weight phong-colour phong-exponent)
-        sphere-surface (Lambertian.)
-        sphere-surface (map->Phong {:phong-exponent 30})
+        my-sphere (map->Sphere {:center ^Vector3 (v/vec3 [0 0.5 3]) :radius 1.5})
+        sphere-surface (map->LambertPhong {:lambert-weight 0.5 :lambert-colour (v/vec [1 0 0])
+                                           :phong-weigh    0.5 :phong-colour (v/vec [1 0 1]) :phong-exponent 1.5})
 
         ^BufferedImage im (new-image res-x res-y)]
 
     (dotimes [ix res-x]
       (dotimes [iy res-y]
-        (let [ray (Ray. camera-location (camera-ray my-camera ix iy))
+        (let [ray (Ray. (:camera-location my-camera) (camera-ray my-camera ix iy))
               {:keys [sphere-intersection normal]} (intersect my-sphere ray)]
           (if sphere-intersection
             (let [
                   eye-direction (- (:P1 ray))
-                  pixel-r (surface-colour sphere-surface {:normal normal :light-direction light-direction :eye-direction eye-direction})]
+                  ^Vector3 pixel-colour (surface-colour sphere-surface {:normal normal :light-direction light-direction :eye-direction eye-direction})
+                  pixel-r (v/get pixel-colour 0)
+                  pixel-g (v/get pixel-colour 1)
+                  pixel-b (v/get pixel-colour 2)]
               ;MUTATING colour-result and im
-              (.setValues colour-result pixel-r 0 0 1.0)
+              (.setValues colour-result pixel-r pixel-g pixel-b 1.0)
               (.setRGB im ix iy (c/argb-from-vector4 colour-result)))))))
     im))
-
 
 (time (image/show (render-sphere2) :title "Isn't it beautiful?"))
 
@@ -199,10 +191,6 @@
   ;  (.setRGB im ix iy (c/argb-from-vector4 colour-result)))
 
   )
-
-
-
-
 (comment
 
 
