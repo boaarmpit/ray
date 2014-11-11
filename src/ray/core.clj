@@ -62,12 +62,21 @@
 
 ;define object types (spheres and planes)
 (defprotocol SceneObject
-  (intersect [this ray]))
+  (intersect [this ray] [this ray camera-origin]))
+
+;reference
+(deftype Cube [a b c]
+  SceneObject
+  (intersect [this ray] 1)
+  (intersect [this ray camera-origin] 2))
+
+
 
 
 (defrecord Sphere [center radius surface]
   SceneObject
-  (intersect [this ray]
+  (intersect
+    [this ray]
     ;(print "intersecting ray with sphere\n")
     (let [P0 (:P0 ray)
           P1 (:P1 ray)
@@ -84,6 +93,8 @@
                                                 normal (v/normalise (- intersection C))]
                                             [intersection normal]))]
         {:sphere-intersection intersection :normal normal}))))
+
+
 
 (defrecord Plane [point normal]
   SceneObject
@@ -158,11 +169,11 @@
 
 
         sphere-surface0 (map->LambertPhong {:lambert-weight 0.8 :lambert-colour (v/vec [1 0 0])
-                                           :phong-weigh    1 :phong-colour (v/vec [1 1 1])
-                                           :phong-exponent 50})
+                                            :phong-weigh    1 :phong-colour (v/vec [1 1 1])
+                                            :phong-exponent 50})
         sphere-surface1 (map->LambertPhong {:lambert-weight 0.5 :lambert-colour (v/vec [1 0 1])
-                                           :phong-weigh    0.5 :phong-colour (v/vec [1 0 1])
-                                           :phong-exponent 5})
+                                            :phong-weigh    0.5 :phong-colour (v/vec [1 0 1])
+                                            :phong-exponent 5})
 
         my-sphere0 (map->Sphere {:center ^Vector3 (v/vec3 [0 0.5 3]) :radius 1.5 :surface sphere-surface0})
         my-sphere1 (map->Sphere {:center ^Vector3 (v/vec3 [0 1.5 3]) :radius 1.5 :surface sphere-surface1})
@@ -189,6 +200,53 @@
                 (.setValues colour-result pixel-r pixel-g pixel-b 1.0)
                 (.setRGB im ix iy (c/argb-from-vector4 colour-result))))))))
     im))
+
+
+(let [my-camera (map->Camera {:camera-location  ^Vector3 (v/vec3 [0 1 0])
+                              :camera-direction ^Vector3 (v/vec3 [0 0 1])
+                              :camera-x         ^Vector3 (v/vec3 [1 0 0])
+                              :camera-y         ^Vector3 (v/vec3 [0 1 0])})
+
+
+      sphere-surface0 (map->LambertPhong {:lambert-weight 0.8 :lambert-colour (v/vec [1 0 0])
+                                          :phong-weigh    1 :phong-colour (v/vec [1 1 1])
+                                          :phong-exponent 50})
+      sphere-surface1 (map->LambertPhong {:lambert-weight 0.5 :lambert-colour (v/vec [1 0 1])
+                                          :phong-weigh    0.5 :phong-colour (v/vec [1 0 1])
+                                          :phong-exponent 5})
+
+      my-sphere0 (map->Sphere {:center ^Vector3 (v/vec3 [0 0.5 3]) :radius 0.5 :surface sphere-surface0})
+      my-sphere1 (map->Sphere {:center ^Vector3 (v/vec3 [0 1.5 3]) :radius 1.5 :surface sphere-surface1})
+
+      scene-objects [my-sphere0 my-sphere1]
+
+
+      ix 250
+      iy 200
+
+      ray (Ray. (:camera-location my-camera) (camera-ray my-camera ix iy))
+      ;need to make vector of rays to use in mapped intersect function
+      ;(same length as scene-objects vector
+      rays [ray ray]
+
+      ;      {:keys [sphere-intersection normal]} (intersect my-sphere0 ray)
+
+      test0 (map intersect scene-objects rays)
+      ; next: make intesect function that
+      ; takes same input + camera origin
+      ; and returns same output + original scene object and distance
+
+      ]
+
+
+  (print (nth test0 0) "\n\n" (nth test0 1))
+
+  )
+
+
+;(defn closest2 [object0 object1]
+;  (let [[object0b intersection normal] (if (vector? object0) object0 [0 0 0]) ]
+;    (print a b c)))
 
 
 (defn closest [[object0 intersection0 normal0] [object1 intersection1 normal1]]
