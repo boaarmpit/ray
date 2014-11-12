@@ -26,7 +26,6 @@
   ([w h]
    (mikera.gui.ImageUtils/newImage (int w) (int h))))
 
-
 (defprotocol SurfaceObject
   (surface-colour [this {:keys [normal light-direction eye-direction]}])
   (surface-reflectivity [this]))
@@ -59,20 +58,9 @@
 
   (surface-reflectivity [this]))
 
-
 ;define object types (spheres and planes)
 (defprotocol SceneObject
   (intersect [this ray] [this ray camera-origin]))
-
-;reference
-(deftype Cube [a b c]
-  SceneObject
-  (intersect [this ray] 1)
-  (intersect [this ray camera-origin] 2))
-
-
-
-
 (defrecord Sphere [center radius surface]
   SceneObject
   (intersect
@@ -92,17 +80,29 @@
                                                 intersection (+ P0 (* t P1))
                                                 normal (v/normalise (- intersection C))]
                                             [intersection normal]))]
-        {:sphere-intersection intersection :normal normal}))))
-
-
-
+        {:sphere-intersection intersection :normal normal})))
+  (intersect
+    [this ray ray-origin]
+    ;(print "intersecting ray with sphere\n")
+    (let [P0 (:P0 ray)
+          P1 (:P1 ray)
+          C center
+          r radius]
+      (v/normalise! P1)
+      (let [a (v/dot P1 P1)
+            b (* 2 (v/dot P1 (- P0 C)))
+            c (- (v/dot (- P0 C) (- P0 C)) (* r r))
+            det (- (* b b) (* 4 a c))
+            hit (pos? det)
+            t (if hit (/ (- 0 b (math/sqrt (- (* b b) (* 4 a c)))) (* 2 a)))
+            intersection (if hit (+ P0 (* t P1)))
+            normal (if intersection (v/normalise (- intersection C)))
+            distance (if intersection (v/distance ray-origin intersection))]
+        {:scene-object this :sphere-intersection intersection :normal normal :distance distance}))))
 (defrecord Plane [point normal]
   SceneObject
   (intersect [this ray]
     (print "intersecting ray with plane\n")))
-
-
-
 
 ;checkerboard texture: returns 1 or 0 for x,y coordinates on checker-spacing size grid
 (defn checker-texture [x y checker-spacing]
@@ -158,6 +158,13 @@
                 (.setRGB im ix iy (c/argb-from-vector4 colour-result)))))))
       im)))
 
+(defn closest [object0 object1]
+  (let [distance0 (:distance object0)
+        distance1 (:distance object1)]
+    (if distance0 (if distance1 (if (< distance0 distance1) object0 object1) object0) (if distance1 object1 nil))
+    ))
+
+
 (defn render-spheres []
   (let [colour-result (v/vec4 [0 0 0 1])
 
@@ -175,31 +182,46 @@
                                             :phong-weigh    0.5 :phong-colour (v/vec [1 0 1])
                                             :phong-exponent 5})
 
-        my-sphere0 (map->Sphere {:center ^Vector3 (v/vec3 [0 0.5 3]) :radius 1.5 :surface sphere-surface0})
-        my-sphere1 (map->Sphere {:center ^Vector3 (v/vec3 [0 1.5 3]) :radius 1.5 :surface sphere-surface1})
+        my-sphere0 (map->Sphere {:center ^Vector3 (v/vec3 [0 1.5 3]) :radius 1.5 :surface sphere-surface0})
+        my-sphere1 (map->Sphere {:center ^Vector3 (v/vec3 [0 0.5 3]) :radius 1.5 :surface sphere-surface1})
 
         scene-objects [my-sphere0 my-sphere1]
 
-
+        ;
+        ;ray-origins (vec (repeat (count scene-objects) ray-origin))
+        ;rays (vec (repeat (count scene-objects) ray))
+        ;intersections (map intersect scene-objects rays ray-origins)
+        ;(nth (sort-by :distance intersections) 0)
 
         ^BufferedImage im (new-image res-x res-y)]
 
     (dotimes [ix res-x]
       (dotimes [iy res-y]
-        (doseq [scene-object scene-objects]
-          (let [ray (Ray. (:camera-location my-camera) (camera-ray my-camera ix iy))
-                {:keys [sphere-intersection normal]} (intersect scene-object ray)]
-            (if sphere-intersection
-              (let [
-                    eye-direction (- (:P1 ray))
-                    ^Vector3 pixel-colour (surface-colour (:surface scene-object) {:normal normal :light-direction light-direction :eye-direction eye-direction})
-                    pixel-r (v/get pixel-colour 0)
-                    pixel-g (v/get pixel-colour 1)
-                    pixel-b (v/get pixel-colour 2)]
-                ;MUTATING colour-result and im
-                (.setValues colour-result pixel-r pixel-g pixel-b 1.0)
-                (.setRGB im ix iy (c/argb-from-vector4 colour-result))))))))
+        (let [ray (Ray. (:camera-location my-camera) (camera-ray my-camera ix iy))
+              rays (vec (repeat (count scene-objects) ray))
+              ray-origins (vec (repeat (count scene-objects) (:camera-location my-camera)))
+              intersections (map intersect scene-objects rays ray-origins)
+              closest-intersection (reduce closest intersections)
+              ]
+
+          (if (:sphere-intersection closest-intersection)
+            (let [
+                  sphere-intersection (:sphere-intersection closest-intersection)
+                  scene-object (:scene-object closest-intersection)
+                  normal (:normal closest-intersection)
+                  eye-direction (- (:P1 ray))
+                  ^Vector3 pixel-colour (surface-colour (:surface scene-object) {:normal normal :light-direction light-direction :eye-direction eye-direction})
+                  pixel-r (v/get pixel-colour 0)
+                  pixel-g (v/get pixel-colour 1)
+                  pixel-b (v/get pixel-colour 2)]
+              ;MUTATING colour-result and im
+              (.setValues colour-result pixel-r pixel-g pixel-b 1.0)
+              (.setRGB im ix iy (c/argb-from-vector4 colour-result)))))))
     im))
+
+
+(time (image/show (render-spheres) :title "Isn't it beautiful?"))
+
 
 
 (let [my-camera (map->Camera {:camera-location  ^Vector3 (v/vec3 [0 1 0])
@@ -215,107 +237,60 @@
                                           :phong-weigh    0.5 :phong-colour (v/vec [1 0 1])
                                           :phong-exponent 5})
 
-      my-sphere0 (map->Sphere {:center ^Vector3 (v/vec3 [0 0.5 3]) :radius 0.5 :surface sphere-surface0})
+      my-sphere0 (map->Sphere {:center ^Vector3 (v/vec3 [0 0.5 3]) :radius 1.5 :surface sphere-surface0})
       my-sphere1 (map->Sphere {:center ^Vector3 (v/vec3 [0 1.5 3]) :radius 1.5 :surface sphere-surface1})
+      my-sphere2 (map->Sphere {:center ^Vector3 (v/vec3 [0 1 5]) :radius 1.5 :surface sphere-surface1})
 
-      scene-objects [my-sphere0 my-sphere1]
+      scene-objects [my-sphere0 my-sphere1 my-sphere2]
 
+      ray-origin ^Vector3 (v/vec3 [0 0 0])
+      ray-origins (vec (repeat (count scene-objects) ray-origin))
 
       ix 250
       iy 200
 
       ray (Ray. (:camera-location my-camera) (camera-ray my-camera ix iy))
-      ;need to make vector of rays to use in mapped intersect function
-      ;(same length as scene-objects vector
-      rays [ray ray]
+      rays (vec (repeat (count scene-objects) ray))
 
-      ;      {:keys [sphere-intersection normal]} (intersect my-sphere0 ray)
-
-      test0 (map intersect scene-objects rays)
-      ; next: make intesect function that
-      ; takes same input + camera origin
-      ; and returns same output + original scene object and distance
+      intersections (map intersect scene-objects rays ray-origins)
 
       ]
 
-
-  (print (nth test0 0) "\n\n" (nth test0 1))
+  ;  (closest (nth intersections 0) (nth intersections 1))
+  (:sphere-intersection (reduce closest intersections))
+  (:sphere-intersection (nth (sort-by :distance intersections) 0))
+  ;min-key not working?
 
   )
 
 
-;(defn closest2 [object0 object1]
-;  (let [[object0b intersection normal] (if (vector? object0) object0 [0 0 0]) ]
-;    (print a b c)))
 
 
-(defn closest [[object0 intersection0 normal0] [object1 intersection1 normal1]]
-  (if (< intersection0 intersection1) [object0 intersection0 normal0] [object1 intersection1 normal1]))
-
-(closest [0 1 "a"] [0 0 "b"])
-
-(reduce closest [[0 1 "a"] [0 2 "b"] [0 0 "c"]])
-
-(defn my-min
-  ([x y] (if (< x y) x y))
-  )
-
-(reduce my-min [1])
-(reduce my-min [2 3 4])
-(reduce my-min [3 2 15 6])
-
-
-(time (image/show (render-spheres) :title "Isn't it beautiful?"))
-
-
+;experiments
 (comment
-  (defprotocol SurfaceObject
-    (surface-colour [this normal light-direction] [this normal light-direction eye-direction])
-    (surface-reflectivity [this]))
+  (defn closest [[object0 intersection0 normal0 distance0] [object1 intersection1 normal1 distance1]]
+    (if (< distance0 distance1) [object0 intersection0 normal0 distance0]
+                                [object1 intersection1 normal1 distance1]))
 
-  (defrecord Lambertian []
-    SurfaceObject
-    (surface-colour [this normal light-direction eye-direction]
-      (let [lambert (- (v/dot normal light-direction))]
-        (if (pos? lambert) lambert 0)))
-    (surface-reflectivity [this]))
 
-  (defrecord Phong [specularity-exponent]
-    SurfaceObject
-    (surface-colour [this normal light-direction eye-direction]
-      (let [light-reflection-direction (+ (* -2 (v/dot light-direction normal) normal) light-direction)
-            dot-light-eye (v/dot light-reflection-direction eye-direction)]
-        (if (pos? dot-light-eye)
-          (math/expt dot-light-eye specularity-exponent)
-          0)))
-    (surface-reflectivity [this]))
 
-  (defrecord LambertPhong [lamb-weight lamb-colour phong-weight phong-colour phong-exponent]
-    SurfaceObject
-    (surface-colour [this normal light-direction eye-direction]
-      (let [light-reflection-direction (+ (* -2 (v/dot light-direction normal) normal) light-direction)
-            dot-light-eye (v/dot light-reflection-direction eye-direction)]
-        (if (pos? dot-light-eye)
-          (math/expt dot-light-eye phong-exponent)
-          0)))
-    (surface-reflectivity [this]))
 
-  ;sphere-surface1 (Lambertian.)
-  ;sphere-surface2 (Phong. 50)
-  ;
-  ;(let [
-  ;      eye-direction (- (:P1 ray))
-  ;      pixel-r (+ (* 1 (surface-colour sphere-surface1 normal light-direction eye-direction))
-  ;                 (* 0 (surface-colour sphere-surface2 normal light-direction eye-direction)))
-  ;      pixel-g (+ (* 0 (surface-colour sphere-surface1 normal light-direction eye-direction))
-  ;                 (* 1 (surface-colour sphere-surface2 normal light-direction eye-direction)))
-  ;      pixel-b (+ (* 0 (surface-colour sphere-surface1 normal light-direction eye-direction))
-  ;                 (* 1 (surface-colour sphere-surface2 normal light-direction eye-direction)))]
-  ;  ;MUTATING colour-result and im
-  ;  (.setValues colour-result pixel-r pixel-g pixel-b 1.0)
-  ;  (.setRGB im ix iy (c/argb-from-vector4 colour-result)))
+  (closest [0 1 "a"] [0 0 "b"])
 
-  )
+  (reduce closest [[0 1 "a"] [0 2 "b"] [0 0 "c"]])
+
+  (defn my-min
+    ([x y] (if (< x y) x y))
+    )
+
+  (reduce my-min [1])
+  (reduce my-min [2 3 4])
+  (reduce my-min [3 2 15 6]))
+
+
+
+
+:old
 (comment
 
 
