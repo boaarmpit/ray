@@ -16,10 +16,10 @@
 (def pi (* 4 (Math/atan 1)))
 
 ;setup output image
-(do
-  ;;image horizontal and vertical resolution
-  (def res-x 500)
-  (def res-y 500))
+
+;;image horizontal and vertical resolution
+(def res-x 500)
+(def res-y 500)
 
 (defn new-image
   "Creates a new blank image"
@@ -169,7 +169,7 @@
   (let [colour-result (v/vec4 [0 0 0 1])
 
         ^Vector3 light-direction (v/normalise (v/vec3 [-1 -1 2]))
-        my-camera (map->Camera {:camera-location  ^Vector3 (v/vec3 [0 1 0])
+        my-camera (map->Camera {:camera-location  ^Vector3 (v/vec3 [0 0.5 -1])
                                 :camera-direction ^Vector3 (v/vec3 [0 0 1])
                                 :camera-x         ^Vector3 (v/vec3 [1 0 0])
                                 :camera-y         ^Vector3 (v/vec3 [0 1 0])})
@@ -181,17 +181,15 @@
         sphere-surface1 (map->LambertPhong {:lambert-weight 0.5 :lambert-colour (v/vec [1 0 1])
                                             :phong-weigh    0.5 :phong-colour (v/vec [1 0 1])
                                             :phong-exponent 5})
+        sphere-surface2 (map->LambertPhong {:lambert-weight 0.5 :lambert-colour (v/vec [0 1 0])
+                                            :phong-weigh    0.2 :phong-colour (v/vec [0 1 1])
+                                            :phong-exponent 2})
 
-        my-sphere0 (map->Sphere {:center ^Vector3 (v/vec3 [0 1.5 3]) :radius 1.5 :surface sphere-surface0})
-        my-sphere1 (map->Sphere {:center ^Vector3 (v/vec3 [0 0.5 3]) :radius 1.5 :surface sphere-surface1})
+        my-sphere0 (map->Sphere {:center ^Vector3 (v/vec3 [1 0 3]) :radius 1.2 :surface sphere-surface0})
+        my-sphere1 (map->Sphere {:center ^Vector3 (v/vec3 [0 1.7 3]) :radius 1.2 :surface sphere-surface1})
+        my-sphere2 (map->Sphere {:center ^Vector3 (v/vec3 [-1 0 3]) :radius 1.2 :surface sphere-surface2})
 
-        scene-objects [my-sphere0 my-sphere1]
-
-        ;
-        ;ray-origins (vec (repeat (count scene-objects) ray-origin))
-        ;rays (vec (repeat (count scene-objects) ray))
-        ;intersections (map intersect scene-objects rays ray-origins)
-        ;(nth (sort-by :distance intersections) 0)
+        scene-objects [my-sphere0 my-sphere1 my-sphere2]
 
         ^BufferedImage im (new-image res-x res-y)]
 
@@ -221,73 +219,6 @@
 
 
 (time (image/show (render-spheres) :title "Isn't it beautiful?"))
-
-
-
-(let [my-camera (map->Camera {:camera-location  ^Vector3 (v/vec3 [0 1 0])
-                              :camera-direction ^Vector3 (v/vec3 [0 0 1])
-                              :camera-x         ^Vector3 (v/vec3 [1 0 0])
-                              :camera-y         ^Vector3 (v/vec3 [0 1 0])})
-
-
-      sphere-surface0 (map->LambertPhong {:lambert-weight 0.8 :lambert-colour (v/vec [1 0 0])
-                                          :phong-weigh    1 :phong-colour (v/vec [1 1 1])
-                                          :phong-exponent 50})
-      sphere-surface1 (map->LambertPhong {:lambert-weight 0.5 :lambert-colour (v/vec [1 0 1])
-                                          :phong-weigh    0.5 :phong-colour (v/vec [1 0 1])
-                                          :phong-exponent 5})
-
-      my-sphere0 (map->Sphere {:center ^Vector3 (v/vec3 [0 0.5 3]) :radius 1.5 :surface sphere-surface0})
-      my-sphere1 (map->Sphere {:center ^Vector3 (v/vec3 [0 1.5 3]) :radius 1.5 :surface sphere-surface1})
-      my-sphere2 (map->Sphere {:center ^Vector3 (v/vec3 [0 1 5]) :radius 1.5 :surface sphere-surface1})
-
-      scene-objects [my-sphere0 my-sphere1 my-sphere2]
-
-      ray-origin ^Vector3 (v/vec3 [0 0 0])
-      ray-origins (vec (repeat (count scene-objects) ray-origin))
-
-      ix 250
-      iy 200
-
-      ray (Ray. (:camera-location my-camera) (camera-ray my-camera ix iy))
-      rays (vec (repeat (count scene-objects) ray))
-
-      intersections (map intersect scene-objects rays ray-origins)
-
-      ]
-
-  ;  (closest (nth intersections 0) (nth intersections 1))
-  (:sphere-intersection (reduce closest intersections))
-  (:sphere-intersection (nth (sort-by :distance intersections) 0))
-  ;min-key not working?
-
-  )
-
-
-
-
-;experiments
-(comment
-  (defn closest [[object0 intersection0 normal0 distance0] [object1 intersection1 normal1 distance1]]
-    (if (< distance0 distance1) [object0 intersection0 normal0 distance0]
-                                [object1 intersection1 normal1 distance1]))
-
-
-
-
-  (closest [0 1 "a"] [0 0 "b"])
-
-  (reduce closest [[0 1 "a"] [0 2 "b"] [0 0 "c"]])
-
-  (defn my-min
-    ([x y] (if (< x y) x y))
-    )
-
-  (reduce my-min [1])
-  (reduce my-min [2 3 4])
-  (reduce my-min [3 2 15 6]))
-
-
 
 
 :old
