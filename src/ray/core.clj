@@ -6,6 +6,7 @@
   (:require [mikera.image.core :as image])
   (:require [ray.colours :as c])
   (:require [mikera.vectorz.core :as v])
+  (:require [mikera.vectorz.matrix :as m])
   (:import [java.awt.image BufferedImage])
   (:import [mikera.vectorz Vector3 Vector4 AVector Vectorz]))
 (set-current-implementation :vectorz)
@@ -72,26 +73,7 @@
 
 (defrecord Sphere [center radius surface]
   SceneObject
-  (intersect
-    [this ray]
-    ;(print "intersecting ray with sphere\n")
-    (let [P0 (:ray-origin ray)
-          P1 (:ray-direction ray)
-          C center
-          r radius]
-      (v/normalise! P1)
-      (let [a (v/dot P1 P1)
-            b (* 2 (v/dot P1 (- P0 C)))
-            c (- (v/dot (- P0 C) (- P0 C)) (* r r))
-            det (- (* b b) (* 4 a c))
-            hit (pos? det)
-            [intersection normal] (if hit (let [t (/ (- 0 b (math/sqrt (- (* b b) (* 4 a c)))) (* 2 a))
-                                                intersection (+ P0 (* t P1))
-                                                normal (v/normalise (- intersection C))]
-                                            [intersection normal]))]
-        {:sphere-intersection intersection :normal normal})))
-  (intersect
-    [this ray ray-origin]
+  (intersect [this ray]
     ;(print "intersecting ray with sphere\n")
     (let [P0 (:ray-origin ray)
           P1 (:ray-direction ray)
@@ -106,13 +88,10 @@
             t (if hit (/ (- 0 b (math/sqrt (- (* b b) (* 4 a c)))) (* 2 a)))
             intersection (if hit (+ P0 (* t P1)))
             normal (if intersection (v/normalise (- intersection C)))
-            distance (if intersection (v/distance ray-origin intersection))]
+            distance (if intersection (v/distance P0 intersection))]
         {:scene-object this :sphere-intersection intersection :normal normal :distance distance}))))
 
-(defrecord Plane [point u-axis v-axis]
-  SceneObject
-  (intersect [this ray ray-origin]
-    (print "intersecting ray with plane\n")))
+
 
 
 ;define camera objects
@@ -128,6 +107,26 @@
     (+ (* 2 (- (/ (+ (rand) (double x)) res-x) 0.5) camera-x) (* -2 (- (/ (+ (rand) (double y)) res-y) 0.5) camera-y) camera-direction)))
 
 
+(defrecord Plane [point u-axis v-axis]
+  SceneObject
+  (intersect [this ray]
+    (let [P1 (:ray-direction ray)
+          M (array [u-axis v-axis (- P1)])
+          det (m/determinant M)]
+      (if-not (zero? det) 1 0))))
+
+
+;testing plane intersection
+(do
+  (def my-plane (map->Plane {:point  (v/vec [0 0 0])
+                             :u-axis (v/vec [1 0 1])
+                             :v-axis (v/vec [0 0 1])}))
+
+  (def my-ray (map->Ray {:ray-origin    (v/vec [0 0 0])
+                         :ray-direction (v/vec [5 0 2])}))
+
+  (intersect my-plane my-ray))
+
 (defn closest
   ([object0] object0)
   ([object0 object1]
@@ -138,13 +137,11 @@
 
 (defn render-spheres []
   (let [colour-result (v/vec4 [0 0 0 1])
-
         ^Vector3 light-direction (v/normalise (v/vec3 [-1 -1 2]))
         my-camera (map->Camera {:camera-location  ^Vector3 (v/vec3 [0 0.5 -1])
                                 :camera-direction ^Vector3 (v/vec3 [0 0 1])
                                 :camera-x         ^Vector3 (v/vec3 [1 0 0])
                                 :camera-y         ^Vector3 (v/vec3 [0 1 0])})
-
 
         sphere-surface0 (map->LambertPhong {:lambert-weight 0.8 :lambert-colour (v/vec [1 0 0])
                                             :phong-weigh    1 :phong-colour (v/vec [1 1 1])
@@ -167,9 +164,8 @@
     (dotimes [ix res-x]
       (dotimes [iy res-y]
         (let [ray (Ray. (:camera-location my-camera) (camera-ray my-camera ix iy))
-              rays (vec (repeat (count scene-objects) ray))
-              ray-origins (vec (repeat (count scene-objects) (:camera-location my-camera)))
-              intersections (map intersect scene-objects rays ray-origins)
+              rays (repeat (count scene-objects) ray)
+              intersections (map intersect scene-objects rays)
               closest-intersection (reduce closest intersections)
               ]
 
