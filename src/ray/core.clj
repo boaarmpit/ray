@@ -16,8 +16,8 @@
 (def pi (* 4 (Math/atan 1)))
 
 ;;image horizontal and vertical resolution
-(def res-x 500)
-(def res-y 500)
+(def res-x 2000)
+(def res-y 2000)
 (defn new-image
   "Creates a new blank image"
   ([w h]
@@ -84,14 +84,15 @@
             b (* 2 (v/dot P1 (- P0 C)))
             c (- (v/dot (- P0 C) (- P0 C)) (* r r))
             det (- (* b b) (* 4 a c))
-            hit (pos? det)
-            t (if hit (/ (- 0 b (math/sqrt (- (* b b) (* 4 a c)))) (* 2 a)))
+            hit-front-back (pos? det)
+            t (if hit-front-back (/ (- 0 b (math/sqrt (- (* b b) (* 4 a c)))) (* 2 a)))
+            hit (if hit-front-back (pos? t))
             intersection (if hit (+ P0 (* t P1)))
             normal (if intersection (v/normalise (- intersection C)))
-            distance (if intersection (v/distance P0 intersection))]
-        {:scene-object this :sphere-intersection intersection :normal normal :distance distance}))))
-
-
+            distance (if hit t)
+            ;distance (if intersection (v/distance P0 intersection))
+            ]
+        {:scene-object this :intersection intersection :normal normal :distance distance}))))
 
 
 ;define camera objects
@@ -106,26 +107,62 @@
         camera-y (:camera-y camera)]
     (+ (* 2 (- (/ (+ (rand) (double x)) res-x) 0.5) camera-x) (* -2 (- (/ (+ (rand) (double y)) res-y) 0.5) camera-y) camera-direction)))
 
-
-(defrecord Plane [point u-axis v-axis]
+(defrecord Plane [plane-point u-axis v-axis normal surface]
   SceneObject
   (intersect [this ray]
-    (let [P1 (:ray-direction ray)
-          M (array [u-axis v-axis (- P1)])
-          det (m/determinant M)]
-      (if-not (zero? det) 1 0))))
+    (let [P0 (:ray-origin ray)
+          P1 (v/normalise (:ray-direction ray))
+          M-trans (array [u-axis v-axis (- P1)])
+          det (m/determinant M-trans)
+          ;M-inv (if-not (zero? det) (m/inverse M-trans))
+          ;b (if M-inv (* M-inv (- P0 plane-point)))
+          ]
+      ;        (print "P0:" P0 "\nP1" P1 "\nM" M-trans "\n\n")
+      (if-not (zero? det)
+        (let [M (m/transpose M-trans)
+              M-inv (m/inverse M)
+              b (mmul M-inv (- P0 plane-point))
+              u-coord (v/get b 0)
+              v-coord (v/get b 1)
+              t (v/get b 2)
+              hit (pos? t)
+              intersection (if hit (+ P0 (* t P1)))
+              distance (if hit t)
 
+              ]
+          {:scene-object this :intersection intersection :normal normal :distance distance
+           :u-coord      u-coord :v-coord v-coord})))))
 
 ;testing plane intersection
-(do
-  (def my-plane (map->Plane {:point  (v/vec [0 0 0])
-                             :u-axis (v/vec [1 0 1])
-                             :v-axis (v/vec [0 0 1])}))
+(comment
 
-  (def my-ray (map->Ray {:ray-origin    (v/vec [0 0 0])
-                         :ray-direction (v/vec [5 0 2])}))
 
-  (intersect my-plane my-ray))
+
+  ;{:scene-object this :intersection intersection :normal normal :distance distance}
+
+  (def plane-surface (map->LambertPhong {:lambert-weight 0.8 :lambert-colour (v/vec [1 0 0])
+                                         :phong-weigh    1 :phong-colour (v/vec [1 1 1])
+                                         :phong-exponent 50}))
+
+  (def my-plane (map->Plane {:plane-point (v/vec [0 0 0])
+                             :u-axis      (v/vec [1 0 0])
+                             :v-axis      (v/vec [0 0 1])
+                             :normal      (v/cross-product! (v/vec [1 0 0]) (v/vec [0 0 1]))
+                             :surface     plane-surface}))
+
+  (def my-ray0 (map->Ray {:ray-origin    (v/vec [0 1 0])
+                          :ray-direction (v/vec [1 -1 1])}))
+
+  (def my-ray1 (map->Ray {:ray-origin    (v/vec [0 1 0])
+                          :ray-direction (v/vec [1 0 1])}))
+
+
+  (print "\n\n hit:"
+         (intersect my-plane my-ray0)
+         "\n\n miss:"
+         (intersect my-plane my-ray1)
+         "\n\n")
+  )
 
 (defn closest
   ([object0] object0)
@@ -154,10 +191,22 @@
                                             :phong-exponent 2})
 
         my-sphere0 (map->Sphere {:center ^Vector3 (v/vec3 [1 0 3]) :radius 1.2 :surface sphere-surface0})
-        my-sphere1 (map->Sphere {:center ^Vector3 (v/vec3 [0 1.7 3]) :radius 1.2 :surface sphere-surface1})
+        my-sphere1 (map->Sphere {:center ^Vector3 (v/vec3 [0 (math/sqrt 3) 3]) :radius 1.2 :surface sphere-surface1})
         my-sphere2 (map->Sphere {:center ^Vector3 (v/vec3 [-1 0 3]) :radius 1.2 :surface sphere-surface2})
 
-        scene-objects [my-sphere0 my-sphere1 my-sphere2]
+        plane-surface (map->LambertPhong {:lambert-weight 0.1 :lambert-colour (v/vec [1 1 1])
+                                          :phong-weigh    1 :phong-colour (v/vec [1 1 1])
+                                          :phong-exponent 50})
+
+        my-plane (map->Plane {:plane-point (v/vec [0 0 (math/sqrt 5.5)])
+                              :u-axis      (v/vec [1 0 0])
+                              :v-axis      (v/vec [0 1 0])
+                              :normal      (v/vec [0 0 -1])          ;(v/cross-product! (v/vec [1 0 0]) (v/vec [0 0 1]))
+                              :surface     plane-surface})
+
+
+
+        scene-objects [my-sphere0 my-sphere1 my-sphere2 my-plane]
 
         ^BufferedImage im (new-image res-x res-y)]
 
@@ -169,9 +218,9 @@
               closest-intersection (reduce closest intersections)
               ]
 
-          (if (:sphere-intersection closest-intersection)
+          (if (:intersection closest-intersection)
             (let [
-                  sphere-intersection (:sphere-intersection closest-intersection)
+                  intersection (:intersection closest-intersection)
                   scene-object (:scene-object closest-intersection)
                   normal (:normal closest-intersection)
                   eye-direction (- (:ray-direction ray))
