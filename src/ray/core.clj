@@ -136,11 +136,10 @@
             scene-object (:scene-object closest-intersection)
             normal (:normal closest-intersection)
             eye-direction (- (:ray-direction ray))
-
-            reflected-ray (if (:reflectivity (:surface scene-object)) (reflect scene-object ray intersection normal))
-
+            reflectivity (:reflectivity (:surface scene-object))
+            reflected-ray (if (and reflectivity (not (zero? reflectivity))) (reflect scene-object ray intersection normal))
             ^Vector3 pixel-colour (if (and (> reflection-depth 0) reflected-ray)
-                                    (+ (* 0.8 (:pixel-colour (trace-ray reflected-ray scene-objects light-direction (- reflection-depth 1))))
+                                    (+ (* reflectivity (:pixel-colour (trace-ray reflected-ray scene-objects light-direction (- reflection-depth 1))))
                                        (surface-colour (:surface scene-object) {:normal normal :light-direction light-direction :eye-direction eye-direction}))
                                     (surface-colour (:surface scene-object) {:normal normal :light-direction light-direction :eye-direction eye-direction})
                                     )]
@@ -160,13 +159,13 @@
 
         sphere-surface0 (map->LambertPhong {:lambert-weight 0.8 :lambert-colour (v/vec [1 0 0])
                                             :phong-weigh    1 :phong-colour (v/vec [1 1 1])
-                                            :phong-exponent 50 :reflectivity 1})
+                                            :phong-exponent 50 :reflectivity 0.8})
         sphere-surface1 (map->LambertPhong {:lambert-weight 0.5 :lambert-colour (v/vec [1 0 1])
                                             :phong-weigh    0.5 :phong-colour (v/vec [1 0 1])
-                                            :phong-exponent 5 :reflectivity 1})
+                                            :phong-exponent 5 :reflectivity 0.8})
         sphere-surface2 (map->LambertPhong {:lambert-weight 0.5 :lambert-colour (v/vec [0 1 0])
                                             :phong-weigh    0.2 :phong-colour (v/vec [0 1 1])
-                                            :phong-exponent 2 :reflectivity 1})
+                                            :phong-exponent 2 :reflectivity 0.8})
 
         my-sphere0 (map->Sphere {:center ^Vector3 (v/vec3 [1 0 3]) :radius 1 :surface sphere-surface0})
         my-sphere1 (map->Sphere {:center ^Vector3 (v/vec3 [0 (math/sqrt 3) 3]) :radius 1 :surface sphere-surface1})
@@ -176,6 +175,42 @@
                                           :phong-weigh    1 :phong-colour (v/vec [1 1 1])
                                           :phong-exponent 5
                                           :reflectivity   1})
+
+        scene-objects [my-sphere0 my-sphere1 my-sphere2]]   ;setup scene
+    (dotimes [ix resolution]
+      (dotimes [iy resolution]
+        (let [ray (Ray. (:camera-location my-camera) (camera-ray my-camera resolution resolution ix iy))]
+          (let [pixel-colour (:pixel-colour (trace-ray ray scene-objects light-direction iterations))
+                pixel-r (if pixel-colour (v/get pixel-colour 0) 0)
+                pixel-g (if pixel-colour (v/get pixel-colour 1) 0)
+                pixel-b (if pixel-colour (v/get pixel-colour 2) 0)]
+            (.setValues colour-result pixel-r pixel-g pixel-b 1.0)
+            (.setRGB im ix iy (c/argb-from-vector4 colour-result))))))
+    im))
+
+(defn render-spheres-and-plane "Example scene depicting 3 adjacent reflective spheres." [resolution iterations]
+  (let [^BufferedImage im (new-image resolution resolution)
+        colour-result (v/vec4 [0 0 0 1])
+
+        ^Vector3 light-direction (v/normalise (v/vec3 [0 0 2]))
+        my-camera (map->Camera {:camera-location  ^Vector3 (v/vec3 [0 (/ (math/sqrt 3) 2) 0])
+                                :camera-direction ^Vector3 (v/vec3 [0 0 1])
+                                :camera-x         ^Vector3 (v/vec3 [1 0 0])
+                                :camera-y         ^Vector3 (v/vec3 [0 1 0])})
+
+
+        sphere-surface (map->LambertPhong {:lambert-weight 0.1 :lambert-colour (v/vec [0.5 1 1])
+                                            :phong-weigh    0.9 :phong-colour (v/vec [1 1 1])
+                                            :phong-exponent 5 :reflectivity 1})
+
+
+        my-sphere0 (map->Sphere {:center ^Vector3 (v/vec3 [1 0 3]) :radius 1 :surface sphere-surface})
+        my-sphere1 (map->Sphere {:center ^Vector3 (v/vec3 [0 (math/sqrt 3) 3]) :radius 1 :surface sphere-surface})
+        my-sphere2 (map->Sphere {:center ^Vector3 (v/vec3 [-1 0 3]) :radius 1 :surface sphere-surface})
+
+        plane-surface (map->LambertPhong {:lambert-weight 0 :lambert-colour (v/vec [1 1 1])
+                                          :phong-weigh    0 :phong-colour (v/vec [1 1 1])
+                                          :phong-exponent 5 :reflectivity 1})
 
         my-plane0 (map->Plane {:plane-point (v/vec [1 0 0])
                                :u-axis      (v/vec [0 1 0])
@@ -201,7 +236,7 @@
                                :normal      (- (v/cross-product! (v/vec [0 0 1]) (v/vec [1 0 0])))
                                :surface     plane-surface})
 
-        scene-objects [my-sphere0 my-sphere1 my-sphere2]]   ;setup scene
+        scene-objects [my-sphere0 my-sphere1 my-sphere2 my-plane0 my-plane1 my-plane2 my-plane3]]   ;setup scene
     (dotimes [ix resolution]
       (dotimes [iy resolution]
         (let [ray (Ray. (:camera-location my-camera) (camera-ray my-camera resolution resolution ix iy))]
@@ -213,7 +248,8 @@
             (.setRGB im ix iy (c/argb-from-vector4 colour-result))))))
     im))
 
-(time (image/show (render-3spheres 100 2) :title "Isn't it beautiful?"))
+
+(time (image/show (render-spheres-and-plane 500 5) :title "Isn't it beautiful?"))
 
 
 
