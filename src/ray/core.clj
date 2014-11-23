@@ -16,13 +16,13 @@
 (defn new-image
   "Creates a new blank image"
   ([w h]
-   (mikera.gui.ImageUtils/newImage (int w) (int h))))       ;setup
+    (mikera.gui.ImageUtils/newImage (int w) (int h))))      ;setup
 
 ;define camera objects
 (defrecord Camera [camera-location camera-direction camera-x camera-y])
 
 ;define rays
-(defrecord Ray  [ray-origin ray-direction] )
+(defrecord Ray [ray-origin ray-direction])
 ;and ray-related functions
 (defn camera-ray [^Camera camera res-x res-y x y]
   (let [camera-direction (:camera-direction camera)
@@ -122,10 +122,11 @@
 (defn closest "Finds the closest of a pair of objects.  Used in trace-ray"
   ([object0] object0)
   ([object0 object1]
-   (let [distance0 (:distance object0)
-         distance1 (:distance object1)]
-     (if distance0 (if distance1 (if (< distance0 distance1) object0 object1) object0) (if distance1 object1 nil))
-     )))
+    (let [distance0 (:distance object0)
+          distance1 (:distance object1)]
+      (if distance0 (if distance1 (if (< distance0 distance1) object0 object1) object0) (if distance1 object1 nil))
+      )))
+
 (defn trace-ray "Traces a ray reflection-depth times and returns a colour.  Returns black if no object found."
   [ray scene-objects light-direction reflection-depth]
   (let [rays (repeat (count scene-objects) ray)
@@ -139,41 +140,42 @@
             eye-direction (- (:ray-direction ray))
             reflectivity (:reflectivity (:surface scene-object))
             reflected-ray (if (and reflectivity (not (zero? reflectivity))) (reflect scene-object ray intersection normal))
-            ^Vector3 pixel-colour (if (and (> reflection-depth 0) reflected-ray)
-                                    (+ (* reflectivity (:pixel-colour (trace-ray reflected-ray scene-objects light-direction (- reflection-depth 1))))
-                                       (surface-colour (:surface scene-object) {:normal normal :light-direction light-direction :eye-direction eye-direction}))
-                                    (surface-colour (:surface scene-object) {:normal normal :light-direction light-direction :eye-direction eye-direction})
-                                    )]
+            pixel-colour (if (and (> reflection-depth 0) reflected-ray)
+                           (+ (* reflectivity (:pixel-colour (trace-ray reflected-ray scene-objects light-direction (- reflection-depth 1))))
+                              (surface-colour (:surface scene-object) {:normal normal :light-direction light-direction :eye-direction eye-direction}))
+                           (surface-colour (:surface scene-object) {:normal normal :light-direction light-direction :eye-direction eye-direction})
+                           )]
         {:pixel-colour pixel-colour :reflected-ray (reflect scene-object ray intersection normal)})
-      {:pixel-colour (v/vec3 [0 0 0])}
+      {:pixel-colour (array [0 0 0])}
       )))
+
 
 (defn render-3spheres "Example scene depicting 3 adjacent reflective spheres." [resolution iterations]
   (let [^BufferedImage im (new-image resolution resolution)
         colour-result (v/vec4 [0 0 0 1])
 
-        ^Vector3 light-direction (v/normalise (v/vec3 [0 0 2]))
-        my-camera (map->Camera {:camera-location  ^Vector3 (v/vec3 [0 0.5 1])
-                                :camera-direction ^Vector3 (v/vec3 [0 0 1])
-                                :camera-x         ^Vector3 (v/vec3 [1 0 0])
-                                :camera-y         ^Vector3 (v/vec3 [0 1 0])})
+        light-direction (v/normalise (v/vec3 [0 0 2]))
+        my-camera (map->Camera {:camera-location  (v/vec3 [0 0.5 1])
+                                :camera-direction (v/vec3 [0 0 1])
+                                :camera-x         (v/vec3 [1 0 0])
+                                :camera-y         (v/vec3 [0 1 0])})
 
-        sphere-surface0 (map->LambertPhong {:lambert-weight 0.8 :lambert-colour (v/vec [1 0 0])
-                                            :phong-weigh    1 :phong-colour (v/vec [1 1 1])
+        sphere-surface0 (map->LambertPhong {:lambert-weight 0.8 :lambert-colour (v/vec3 [1 0 0])
+                                            :phong-weigh    1 :phong-colour (v/vec3 [1 1 1])
                                             :phong-exponent 50 :reflectivity 0.8})
-        sphere-surface1 (map->LambertPhong {:lambert-weight 0.5 :lambert-colour (v/vec [1 0 1])
-                                            :phong-weigh    0.5 :phong-colour (v/vec [1 0 1])
+        sphere-surface1 (map->LambertPhong {:lambert-weight 0.5 :lambert-colour (v/vec3 [1 0 1])
+                                            :phong-weigh    0.5 :phong-colour (v/vec3 [1 0 1])
                                             :phong-exponent 5 :reflectivity 0.8})
-        sphere-surface2 (map->LambertPhong {:lambert-weight 0.5 :lambert-colour (v/vec [0 1 0])
-                                            :phong-weigh    0.2 :phong-colour (v/vec [0 1 1])
+        sphere-surface2 (map->LambertPhong {:lambert-weight 0.5 :lambert-colour (v/vec3 [0 1 0])
+                                            :phong-weigh    0.2 :phong-colour (v/vec3 [0 1 1])
                                             :phong-exponent 2 :reflectivity 0.8})
 
-        my-sphere0 (map->Sphere {:center ^Vector3 (v/vec3 [1 0 3]) :radius 1 :surface sphere-surface0})
-        my-sphere1 (map->Sphere {:center ^Vector3 (v/vec3 [0 (math/sqrt 3) 3]) :radius 1 :surface sphere-surface1})
-        my-sphere2 (map->Sphere {:center ^Vector3 (v/vec3 [-1 0 3]) :radius 1 :surface sphere-surface2})
+        my-sphere0 (map->Sphere {:center (v/vec3 [1 0 3]) :radius 1 :surface sphere-surface0})
+        my-sphere1 (map->Sphere {:center (v/vec3 [0 (math/sqrt 3) 3]) :radius 1 :surface sphere-surface1})
+        my-sphere2 (map->Sphere {:center (v/vec3 [-1 0 3]) :radius 1 :surface sphere-surface2})
 
-        plane-surface (map->LambertPhong {:lambert-weight 0.1 :lambert-colour (v/vec [1 1 1])
-                                          :phong-weigh    1 :phong-colour (v/vec [1 1 1])
+        plane-surface (map->LambertPhong {:lambert-weight 0.1 :lambert-colour (v/vec3 [1 1 1])
+                                          :phong-weigh    1 :phong-colour (v/vec3 [1 1 1])
                                           :phong-exponent 5
                                           :reflectivity   1})
 
@@ -193,57 +195,57 @@
   (let [^BufferedImage im (new-image resolution resolution)
         colour-result (v/vec4 [0 0 0 1])
 
-        ^Vector3 light-direction (v/normalise (v/vec3 [0 0 2]))
-        my-camera (map->Camera {:camera-location  ^Vector3 (v/vec3 [0 (/ (math/sqrt 3) 2) 0])
-                                :camera-direction ^Vector3 (v/vec3 [0 0 1])
-                                :camera-x         ^Vector3 (v/vec3 [1 0 0])
-                                :camera-y         ^Vector3 (v/vec3 [0 1 0])})
+        light-direction (v/normalise (v/vec3 [0 0 2]))
+        my-camera (map->Camera {:camera-location  (v/vec3 [0 (/ (math/sqrt 3) 2) 0])
+                                :camera-direction (v/vec3 [0 0 1])
+                                :camera-x         (v/vec3 [1 0 0])
+                                :camera-y         (v/vec3 [0 1 0])})
 
 
-        sphere-surface0 (map->LambertPhong {:lambert-weight 0.1 :lambert-colour (v/vec [1 1 1])
-                                            :phong-weigh    0.9 :phong-colour (v/vec [1 0 0])
+        sphere-surface0 (map->LambertPhong {:lambert-weight 0.1 :lambert-colour (v/vec3 [1 1 1])
+                                            :phong-weigh    0.9 :phong-colour (v/vec3 [1 0 0])
                                             :phong-exponent 5 :reflectivity 1})
-        sphere-surface1 (map->LambertPhong {:lambert-weight 0.1 :lambert-colour (v/vec [1 1 1])
-                                           :phong-weigh    0.9 :phong-colour (v/vec [0 1 0])
-                                           :phong-exponent 5 :reflectivity 1})
-        sphere-surface2 (map->LambertPhong {:lambert-weight 0.1 :lambert-colour (v/vec [1 1 1])
-                                           :phong-weigh    0.9 :phong-colour (v/vec [0 0 1])
-                                           :phong-exponent 5 :reflectivity 1})
+        sphere-surface1 (map->LambertPhong {:lambert-weight 0.1 :lambert-colour (v/vec3 [1 1 1])
+                                            :phong-weigh    0.9 :phong-colour (v/vec3 [0 1 0])
+                                            :phong-exponent 5 :reflectivity 1})
+        sphere-surface2 (map->LambertPhong {:lambert-weight 0.1 :lambert-colour (v/vec3 [1 1 1])
+                                            :phong-weigh    0.9 :phong-colour (v/vec3 [0 0 1])
+                                            :phong-exponent 5 :reflectivity 1})
 
 
-        my-sphere0 (map->Sphere {:center ^Vector3 (v/vec3 [1 0 3]) :radius 1 :surface sphere-surface0})
-        my-sphere1 (map->Sphere {:center ^Vector3 (v/vec3 [0 (math/sqrt 3) 3]) :radius 1 :surface sphere-surface1})
-        my-sphere2 (map->Sphere {:center ^Vector3 (v/vec3 [-1 0 3]) :radius 1 :surface sphere-surface2})
+        my-sphere0 (map->Sphere {:center (v/vec3 [1 0 3]) :radius 1 :surface sphere-surface0})
+        my-sphere1 (map->Sphere {:center (v/vec3 [0 (math/sqrt 3) 3]) :radius 1 :surface sphere-surface1})
+        my-sphere2 (map->Sphere {:center (v/vec3 [-1 0 3]) :radius 1 :surface sphere-surface2})
 
-        plane-surface (map->LambertPhong {:lambert-weight 0 :lambert-colour (v/vec [1 1 1])
-                                          :phong-weigh    0 :phong-colour (v/vec [1 1 1])
+        plane-surface (map->LambertPhong {:lambert-weight 0 :lambert-colour (v/vec3 [1 1 1])
+                                          :phong-weigh    0 :phong-colour (v/vec3 [1 1 1])
                                           :phong-exponent 5 :reflectivity 1})
 
-        my-plane0 (map->Plane {:plane-point (v/vec [1 0 0])
-                               :u-axis      (v/vec [0 1 0])
-                               :v-axis      (v/vec [0 0 1])
-                               :normal      (- (v/cross-product! (v/vec [0 1 0]) (v/vec [0 0 1])))
+        my-plane0 (map->Plane {:plane-point (v/vec3 [1 0 0])
+                               :u-axis      (v/vec3 [0 1 0])
+                               :v-axis      (v/vec3 [0 0 1])
+                               :normal      (- (cross! (v/vec3 [0 1 0]) (v/vec3 [0 0 1])))
                                :surface     plane-surface})
 
-        my-plane1 (map->Plane {:plane-point (v/vec [-1 0 0])
-                               :u-axis      (v/vec [0 0 1])
-                               :v-axis      (v/vec [0 1 0])
-                               :normal      (- (v/cross-product! (v/vec [0 0 1]) (v/vec [0 1 0])))
+        my-plane1 (map->Plane {:plane-point (v/vec3 [-1 0 0])
+                               :u-axis      (v/vec3 [0 0 1])
+                               :v-axis      (v/vec3 [0 1 0])
+                               :normal      (- (cross! (v/vec3 [0 0 1]) (v/vec3 [0 1 0])))
                                :surface     plane-surface})
 
-        my-plane2 (map->Plane {:plane-point (v/vec [0 0 0])
-                               :u-axis      (v/vec [1 0 0])
-                               :v-axis      (v/vec [0 0 1])
-                               :normal      (- (v/cross-product! (v/vec [1 0 0]) (v/vec [0 0 1])))
+        my-plane2 (map->Plane {:plane-point (v/vec3 [0 0 0])
+                               :u-axis      (v/vec3 [1 0 0])
+                               :v-axis      (v/vec3 [0 0 1])
+                               :normal      (- (cross! (v/vec3 [1 0 0]) (v/vec3 [0 0 1])))
                                :surface     plane-surface})
 
-        my-plane3 (map->Plane {:plane-point (v/vec [0 (math/sqrt 3) 0])
-                               :u-axis      (v/vec [0 0 1])
-                               :v-axis      (v/vec [1 0 0])
-                               :normal      (- (v/cross-product! (v/vec [0 0 1]) (v/vec [1 0 0])))
+        my-plane3 (map->Plane {:plane-point (v/vec3 [0 (math/sqrt 3) 0])
+                               :u-axis      (v/vec3 [0 0 1])
+                               :v-axis      (v/vec3 [1 0 0])
+                               :normal      (- (cross! (v/vec3 [0 0 1]) (v/vec3 [1 0 0])))
                                :surface     plane-surface})
 
-        scene-objects [my-sphere0 my-sphere1 my-sphere2 my-plane0 my-plane1 my-plane2 my-plane3]]   ;setup scene
+        scene-objects [my-sphere0 my-sphere1 my-sphere2 my-plane0 my-plane1 my-plane2 my-plane3]] ;setup scene
     (dotimes [ix resolution]
       (dotimes [iy resolution]
         (let [ray (Ray. (:camera-location my-camera) (camera-ray my-camera resolution resolution ix iy))]
@@ -256,11 +258,64 @@
     im))
 
 
-(time (image/show (render-spheres-and-plane 500 3) :title "Isn't it beautiful?"))
+(defn test-scene "Example scene depicting 3 adjacent reflective spheres." [resolution iterations]
+  (let [^BufferedImage im (new-image resolution resolution)
+        colour-result (v/vec4 [0 0 0 1])
+
+        light-direction (v/normalise (v/vec3 [0 -2 2]))
+        my-camera (map->Camera {:camera-location  (v/vec3 [0 -0.5 -1])
+                                :camera-direction (v/vec3 [0 0 1])
+                                :camera-x         (v/vec3 [1 0 0])
+                                :camera-y         (v/vec3 [0 1 0])})
 
 
+        sphere-surface0 (map->LambertPhong {:lambert-weight 0.1 :lambert-colour (v/vec3 [1 1 1])
+                                            :phong-weigh    0.9 :phong-colour (v/vec3 [1 0 0])
+                                            :phong-exponent 5 :reflectivity 0.5})
 
 
+        my-sphere0 (map->Sphere {:center (v/vec3 [1 0 3]) :radius 1 :surface sphere-surface0})
+        my-sphere1 (map->Sphere {:center (v/vec3 [0 (math/sqrt 3) 3]) :radius 1 :surface sphere-surface0})
+        my-sphere2 (map->Sphere {:center (v/vec3 [-1 0 3]) :radius 1 :surface sphere-surface0})
+
+        plane-surface (map->LambertPhong {:lambert-weight 0.2 :lambert-colour (v/vec3 [1 1 1])
+                                          :phong-weigh    0 :phong-colour (v/vec3 [1 1 1])
+                                          :phong-exponent 5 :reflectivity 1})
+
+        my-plane0 (map->Plane {:plane-point (v/vec3 [0 -1 0])
+                               :u-axis      (v/vec3 [1 0 0])
+                               :v-axis      (v/vec3 [0 0 1])
+                               :normal      (- (cross! (v/vec3 [1 0 0]) (v/vec3 [0 0 1])))
+                               :surface     plane-surface})
+
+
+        scene-objects [my-sphere0 my-plane0]
+        ;camera-direction (v/vec3 [0 0 1])
+        ;camera-x (v/vec3 [1 0 0])
+        ;camera-y (v/vec3 [0 1 0])
+        ;dir camera-direction
+        ;res-x resolution
+        ;res-y resolution
+
+        ]                                                   ;setup scene
+    (dotimes [ix resolution]
+      (dotimes [iy resolution]
+        ;(.set dir camera-direction)
+        ;(v/add-multiple! dir camera-x (* 2 (- (/ (double ix) res-x) 0.5)))
+        ;(v/add-multiple! dir camera-y (* -2 (- (/ (double iy) res-y) 0.5)))
+        ;(v/normalise! dir)
+        (let [ray (Ray. (:camera-location my-camera) (camera-ray my-camera resolution resolution ix iy))
+              pixel-colour (:pixel-colour (trace-ray ray scene-objects light-direction iterations))
+              pixel-r (if pixel-colour (v/get pixel-colour 0) 0)
+              pixel-g (if pixel-colour (v/get pixel-colour 1) 0)
+              pixel-b (if pixel-colour (v/get pixel-colour 2) 0)]
+          (.setValues colour-result pixel-r pixel-g pixel-b 1.0)
+          (.setRGB im ix iy (c/argb-from-vector4 colour-result)))))
+    im))
+
+;(time (image/show (render-spheres-and-plane 300 1) :title "Isn't it beautiful?"))
+;(time (image/show (render-3spheres 500 10) :title "Isn't it beautiful?"))
+(time (image/show (test-scene 500 0) :title "Isn't it beautiful?"))
 
 
 
