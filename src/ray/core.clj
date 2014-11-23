@@ -18,6 +18,20 @@
   ([w h]
    (mikera.gui.ImageUtils/newImage (int w) (int h))))       ;setup
 
+;define camera objects
+(defrecord Camera [camera-location camera-direction camera-x camera-y])
+
+;define rays
+(defrecord Ray  [ray-origin ray-direction] )
+;and ray-related functions
+(defn camera-ray [^Camera camera res-x res-y x y]
+  (let [camera-direction (:camera-direction camera)
+        camera-x (:camera-x camera)
+        camera-y (:camera-y camera)]
+    (v/normalise (+ (* 2 (- (/ (double x) res-x) 0.5) camera-x) (* -2 (- (/ (double y) res-y) 0.5) camera-y) camera-direction)))
+  ;(v/normalise (+ (* 2 (- (/ (+ (rand) (double x)) res-x) 0.5) camera-x) (* -2 (- (/ (+ (rand) (double y)) res-y) 0.5) camera-y) camera-direction))
+  )
+
 ;define geometric object types (spheres and planes)
 (defprotocol SceneObject
   (intersect [this ray] [this ray camera-origin])
@@ -103,19 +117,6 @@
         ys (math/round (/ (mod y checker-spacing) checker-spacing))]
     (* 0.7 (mod (+ xs ys) 2.0))))
 
-;define camera objects
-(defrecord Camera [camera-location camera-direction camera-x camera-y])
-
-;define rays
-(defrecord Ray  [ray-origin ray-direction] )
-;and ray-related functions
-(defn camera-ray [^Camera camera res-x res-y x y]
-  (let [camera-direction (:camera-direction camera)
-        camera-x (:camera-x camera)
-        camera-y (:camera-y camera)]
-    (v/normalise (+ (* 2 (- (/ (double x) res-x) 0.5) camera-x) (* -2 (- (/ (double y) res-y) 0.5) camera-y) camera-direction)))
-  ;(v/normalise (+ (* 2 (- (/ (+ (rand) (double x)) res-x) 0.5) camera-x) (* -2 (- (/ (+ (rand) (double y)) res-y) 0.5) camera-y) camera-direction))
-  )
 
 ;define core ray tracing functions
 (defn closest "Finds the closest of a pair of objects.  Used in trace-ray"
@@ -199,14 +200,20 @@
                                 :camera-y         ^Vector3 (v/vec3 [0 1 0])})
 
 
-        sphere-surface (map->LambertPhong {:lambert-weight 0.1 :lambert-colour (v/vec [0.5 1 1])
-                                            :phong-weigh    0.9 :phong-colour (v/vec [1 1 1])
+        sphere-surface0 (map->LambertPhong {:lambert-weight 0.1 :lambert-colour (v/vec [1 1 1])
+                                            :phong-weigh    0.9 :phong-colour (v/vec [1 0 0])
                                             :phong-exponent 5 :reflectivity 1})
+        sphere-surface1 (map->LambertPhong {:lambert-weight 0.1 :lambert-colour (v/vec [1 1 1])
+                                           :phong-weigh    0.9 :phong-colour (v/vec [0 1 0])
+                                           :phong-exponent 5 :reflectivity 1})
+        sphere-surface2 (map->LambertPhong {:lambert-weight 0.1 :lambert-colour (v/vec [1 1 1])
+                                           :phong-weigh    0.9 :phong-colour (v/vec [0 0 1])
+                                           :phong-exponent 5 :reflectivity 1})
 
 
-        my-sphere0 (map->Sphere {:center ^Vector3 (v/vec3 [1 0 3]) :radius 1 :surface sphere-surface})
-        my-sphere1 (map->Sphere {:center ^Vector3 (v/vec3 [0 (math/sqrt 3) 3]) :radius 1 :surface sphere-surface})
-        my-sphere2 (map->Sphere {:center ^Vector3 (v/vec3 [-1 0 3]) :radius 1 :surface sphere-surface})
+        my-sphere0 (map->Sphere {:center ^Vector3 (v/vec3 [1 0 3]) :radius 1 :surface sphere-surface0})
+        my-sphere1 (map->Sphere {:center ^Vector3 (v/vec3 [0 (math/sqrt 3) 3]) :radius 1 :surface sphere-surface1})
+        my-sphere2 (map->Sphere {:center ^Vector3 (v/vec3 [-1 0 3]) :radius 1 :surface sphere-surface2})
 
         plane-surface (map->LambertPhong {:lambert-weight 0 :lambert-colour (v/vec [1 1 1])
                                           :phong-weigh    0 :phong-colour (v/vec [1 1 1])
@@ -249,7 +256,7 @@
     im))
 
 
-(time (image/show (render-spheres-and-plane 500 5) :title "Isn't it beautiful?"))
+(time (image/show (render-spheres-and-plane 500 3) :title "Isn't it beautiful?"))
 
 
 
